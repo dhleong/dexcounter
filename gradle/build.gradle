@@ -1,0 +1,84 @@
+/*
+This file based on:
+
+https://github.com/dextorer/MethodsCount/blob/5c35deab4c0e68df9844edebd5afba2ca91dad55/gradle_env/build.gradle
+
+which has the following license:
+
+MIT License
+
+Copyright (c) 2018 Sebastiano Gottardo, Nicola Miotto
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+apply plugin: 'groovy'
+
+repositories {
+    google()
+    jcenter()
+    mavenCentral()
+    maven { url "https://jitpack.io" }
+    maven { url 'https://maven.fabric.io/public' }
+}
+
+String SEPARATOR = "|"
+String NEW_LINE = "\n"
+String INPUT_DEP = project.properties['inputDep']
+
+if (!INPUT_DEP) {
+    throw new GradleException("No input dependency specified :(")
+}
+project.dependencies.add("compile", INPUT_DEP)
+
+task deps << {
+    def mainDepWriter = new StringWriter()
+    def transitiveDepsWriter = new StringWriter()
+    def deps = project.configurations.compile.resolve()
+    if (deps.isEmpty()) {
+        throw new GradleException("Nothing resolved :(")
+    } else {
+        project.configurations.compile.resolvedConfiguration.resolvedArtifacts.each { artifact ->
+            // group|name|version|file|size
+            def component = artifact.id.componentIdentifier
+            def isMainLibrary = project.configurations.compile.dependencies.find { it.group.equals(component.group) && it.name.equals(component.module) } != null ? "true" : "false"
+            def writer = isMainLibrary ? mainDepWriter : transitiveDepsWriter
+            writer.append(component.group).append(SEPARATOR)
+            writer.append(component.module).append(SEPARATOR)
+            writer.append(component.version).append(SEPARATOR)
+            writer.append(artifact.file.absolutePath).append(SEPARATOR)
+            writer.append(String.valueOf(artifact.file.size()))
+            writer.append(NEW_LINE)
+        }
+    }
+    printOutput(mainDepWriter)
+    printOutput(transitiveDepsWriter)
+}
+
+def printOutput(Writer writer) {
+    String output = project.properties['output']
+    if (output) {
+        File fileOut = new File(project.projectDir, output)
+        fileOut.delete()
+        fileOut.createNewFile()
+        fileOut.setText(writer.toString().trim())
+    } else {
+        println writer.toString().trim()
+    }
+}
