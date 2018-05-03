@@ -1,9 +1,11 @@
 package counters
 
 import (
+	"archive/zip"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	st "github.com/palantir/stacktrace"
 
 	"github.com/dhleong/dexcounter/src/model"
+	"github.com/dhleong/dexcounter/src/util"
 )
 
 // DxDexCounter uses the dx tool, provided with the Android SDK,
@@ -78,12 +81,28 @@ func (dc *DxDexCounter) count(dep *model.Counts) error {
 		return fmt.Errorf("No Path for %v", dep.Dependency)
 	}
 
+	// easy case
 	if strings.HasSuffix(dep.Path, ".jar") {
 		return dc.checkJar(dep, dep.Path)
 	}
 
-	// FIXME TODO handle .aar
+	// handle .aar
+	if strings.HasSuffix(dep.Path, ".aar") {
+		dir, err := util.GetConfigDir("aars")
+		if err != nil {
+			return err
+		}
 
+		jarName := strings.Replace(dep.Dependency.String(), ":", "-", -1)
+		jarPath := filepath.Join(dir, fmt.Sprintf("%s.jar", jarName))
+		if err := extractClassesJarTo(dep.Path, jarPath); err != nil {
+			return err
+		}
+
+		return dc.checkJar(dep, jarPath)
+	}
+
+	// something else
 	return nil
 }
 
@@ -110,6 +129,46 @@ func (dc *DxDexCounter) checkJar(dep *model.Counts, jarPath string) error {
 	methodsBytes := bytes[88:92]
 	dep.OwnFields = int(binary.LittleEndian.Uint32(fieldsBytes))
 	dep.OwnMethods = int(binary.LittleEndian.Uint32(methodsBytes))
+
+	return nil
+}
+
+func extractClassesJarTo(aarPath, destPath string) error {
+
+	if _, err := os.Stat(destPath); err == nil {
+		// jar already exists!
+		return nil
+	}
+
+	zipFile, err := zip.OpenReader(aarPath)
+	if err != nil {
+		return err
+	}
+	defer zipFile.Close()
+
+	for _, f := range zipFile.File {
+		if f.Name == "classes.jar" {
+			zipFp, err := f.Open()
+			if err != nil {
+				return err
+			}
+			defer zipFp.Close()
+
+			destFp, err := os.Create(destPath)
+			if err != nil {
+				return err
+			}
+			defer destFp.Close()
+
+			_, err = io.Copy(destFp, zipFp)
+			if err != nil {
+				return err
+			}
+
+			// done!
+			break
+		}
+	}
 
 	return nil
 }

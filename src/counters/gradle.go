@@ -11,9 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	homedir "github.com/mitchellh/go-homedir"
-
 	"github.com/dhleong/dexcounter/src/model"
+	"github.com/dhleong/dexcounter/src/util"
 )
 
 type gradleDexCounter struct {
@@ -97,25 +96,12 @@ func ensureGradleSetUp() (string, error) {
 		return "gradle", nil
 	}
 
-	// now, fall back to real implementation, downloading the
-	// gradle files from github to a local directory
-	dir, err := homedir.Expand("~/.config/dexcounter/gradle")
+	_, err := util.GetConfigDir("gradle")
 	if err != nil {
 		return "", err
 	}
 
-	if _, err := os.Stat(dir); err != nil {
-		if !os.IsNotExist(err) {
-			// some unexpected issue; report it:
-			return "", err
-		}
-
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return "", err
-		}
-	}
-
-	// TODO download
+	// FIXME TODO download into the dir fetched above
 
 	return "", errors.New("Not implemented yet")
 }
