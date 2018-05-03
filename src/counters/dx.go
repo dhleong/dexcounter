@@ -95,15 +95,20 @@ func (dc *DxDexCounter) count(dep *model.Counts) error {
 
 		jarName := strings.Replace(dep.Dependency.String(), ":", "-", -1)
 		jarPath := filepath.Join(dir, fmt.Sprintf("%s.jar", jarName))
-		if err := extractClassesJarTo(dep.Path, jarPath); err != nil {
+		foundJar, err := extractClassesJarTo(dep.Path, jarPath)
+		if err != nil {
 			return err
+		}
+		if !foundJar {
+			// resources-only .aar
+			return nil
 		}
 
 		return dc.checkJar(dep, jarPath)
 	}
 
 	// something else
-	return nil
+	return fmt.Errorf("Unknown dependency format: %s", dep.Path)
 }
 
 func (dc *DxDexCounter) checkJar(dep *model.Counts, jarPath string) error {
@@ -133,16 +138,17 @@ func (dc *DxDexCounter) checkJar(dep *model.Counts, jarPath string) error {
 	return nil
 }
 
-func extractClassesJarTo(aarPath, destPath string) error {
+// Returns True if there were classes in the .aar
+func extractClassesJarTo(aarPath, destPath string) (bool, error) {
 
 	if _, err := os.Stat(destPath); err == nil {
 		// jar already exists!
-		return nil
+		return true, nil
 	}
 
 	zipFile, err := zip.OpenReader(aarPath)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer zipFile.Close()
 
@@ -150,27 +156,28 @@ func extractClassesJarTo(aarPath, destPath string) error {
 		if f.Name == "classes.jar" {
 			zipFp, err := f.Open()
 			if err != nil {
-				return err
+				return false, err
 			}
 			defer zipFp.Close()
 
 			destFp, err := os.Create(destPath)
 			if err != nil {
-				return err
+				return false, err
 			}
 			defer destFp.Close()
 
 			_, err = io.Copy(destFp, zipFp)
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			// done!
-			break
+			return true, nil
 		}
 	}
 
-	return nil
+	// no classes; probably resources-only .aar
+	return false, nil
 }
 
 func pickDxPath(opts *model.Options) (string, error) {
