@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/docopt/docopt-go"
 
@@ -9,27 +10,35 @@ import (
 	"github.com/dhleong/dexcounter/src/model"
 )
 
-func main() {
-	opts, _ := docopt.ParseDoc(
-		`dexcounter
+func parseOptions() *model.Options {
+	usage := `dexcounter
 
-Usage: dexcounter [<dependency>]
-		`,
+Usage: dexcounter <dependency>
+
+Options:
+	--dx <pathToDx>  Path to dx executable; required if $ANDROID_HOME
+					 is not set
+		`
+	args, _ := docopt.ParseArgs(
+		usage,
+		os.Args[1:],
+		fmt.Sprintf("dexcounter version %s", dexcounter.Version),
 	)
 
-	counter, err := dexcounter.NewDexCounter()
+	options := model.Options{}
+	args.Bind(&options)
+	return &options
+}
+
+func main() {
+	opts := parseOptions()
+
+	counter, err := dexcounter.NewDexCounter(opts)
 	if err != nil {
 		panic(err)
 	}
 
-	depString := opts["<dependency>"]
-	if depString == nil {
-		// for dev purposes this arg is optional,
-		// but it should not be...
-		depString = "com.squareup.okhttp3:okhttp:3.10.0"
-	}
-
-	dep, err := model.ParseDependency(depString.(string))
+	dep, err := model.ParseDependency(opts.Dependency)
 	if err != nil {
 		panic(err)
 	}

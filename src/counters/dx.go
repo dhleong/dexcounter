@@ -2,8 +2,11 @@ package counters
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -21,12 +24,18 @@ type DxDexCounter struct {
 
 // NewDxDexCounter .
 func NewDxDexCounter(
+	opts *model.Options,
 	dependenciesSource model.DexCounter,
 ) (model.DexCounter, error) {
-	// FIXME TODO pick a dir, any (?) dir:
+
+	dx, err := pickDxPath(opts)
+	if err != nil {
+		return nil, err
+	}
+
 	return &DxDexCounter{
 		dependenciesSource,
-		"/lib/android-sdk/build-tools/27.0.3/dx",
+		dx,
 	}, nil
 }
 
@@ -103,4 +112,40 @@ func (dc *DxDexCounter) checkJar(dep *model.Counts, jarPath string) error {
 	dep.OwnMethods = int(binary.LittleEndian.Uint32(methodsBytes))
 
 	return nil
+}
+
+func pickDxPath(opts *model.Options) (string, error) {
+
+	if opts.DxPath != "" {
+		// verify it exists
+		if _, err := os.Stat(opts.DxPath); err == nil {
+			// cool!
+			return opts.DxPath, nil
+		}
+
+		return "", fmt.Errorf(
+			"Provided dx path is invalid: %s",
+			opts.DxPath,
+		)
+	}
+
+	// try $ANDROID_HOME
+	androidHome := os.Getenv("ANDROID_HOME")
+	if androidHome != "" {
+		if fromHome := pickDxPathFromHome(androidHome); fromHome != "" {
+			return fromHome, nil
+		}
+	}
+
+	return "", errors.New("Unable to locate `dx`")
+}
+
+func pickDxPathFromHome(home string) string {
+	matches, err := filepath.Glob(fmt.Sprintf("%s/build-tools/*/dx", home))
+	if err != nil || len(matches) == 0 {
+		// no matches
+		return ""
+	}
+
+	return matches[len(matches)-1]
 }
