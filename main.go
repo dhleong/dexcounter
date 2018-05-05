@@ -11,14 +11,14 @@ import (
 )
 
 func parseOptions() *model.Options {
-	usage := `dexcounter
+	usage := `dexcounter: For counting methods. For Dex files.
 
 Usage: dexcounter <dependency>
 
 Options:
-	--dx <pathToDx>  Path to dx executable; required if $ANDROID_HOME
-					 is not set
-		`
+  --dx <pathToDx>  Path to dx executable; required if $ANDROID_HOME is not set
+  -h, --help       Show this screen.
+  --version        Show version.`
 	args, _ := docopt.ParseArgs(
 		usage,
 		os.Args[1:],
