@@ -17,16 +17,21 @@ import (
 	"github.com/dhleong/dexcounter/src/util"
 )
 
+// baseURL links to a specific revision to ensure compatibility
+const commitHash = "e73d86ddd404adaf3daec9fcd1947f20c2cc5c5f"
+const baseURL = "https://raw.githubusercontent.com/dhleong/dexcounter/" + commitHash + "/gradle/"
+
+// these are suffixes to baseURL
 var gradleFileURLs = []string{
-	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/gradlew.bat",
-	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/gradlew",
-	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/gradle.properties",
-	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/build.gradle",
+	"gradlew.bat",
+	"gradlew",
+	"gradle.properties",
+	"build.gradle",
 }
 
 var gradleWrapperFileURLs = []string{
-	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/gradle/wrapper/gradle-wrapper.properties",
-	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/gradle/wrapper/gradle-wrapper.jar",
+	"gradle/wrapper/gradle-wrapper.properties",
+	"gradle/wrapper/gradle-wrapper.jar",
 }
 
 type gradleDexCounter struct {
@@ -110,12 +115,14 @@ func ensureGradleSetUp() (string, error) {
 	}
 
 	// normal mode, okay create the dirs
-	gradleFilesDir, err := util.GetConfigDir("gradle")
+	gradleFilesDir, err := util.GetConfigDir("gradle/" + commitHash)
 	if err != nil {
 		return "", err
 	}
 
-	gradleWrapperDir, err := util.GetConfigDir("gradle/gradle/wrapper")
+	gradleWrapperDir, err := util.GetConfigDir(
+		"gradle/" + commitHash + "/gradle/wrapper",
+	)
 	if err != nil {
 		return "", err
 	}
@@ -175,7 +182,8 @@ func downloadTo(url, destDir string) error {
 	defer out.Close()
 
 	// request the remote file
-	resp, err := http.Get(url)
+	var fullURL = baseURL + url
+	resp, err := http.Get(fullURL)
 	if err != nil {
 		return err
 	}
