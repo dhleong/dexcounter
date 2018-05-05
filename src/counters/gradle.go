@@ -3,17 +3,31 @@ package counters
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/dhleong/dexcounter/src/model"
 	"github.com/dhleong/dexcounter/src/util"
 )
+
+var gradleFileURLs = []string{
+	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/gradlew.bat",
+	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/gradlew",
+	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/gradle.properties",
+	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/build.gradle",
+}
+
+var gradleWrapperFileURLs = []string{
+	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/gradle/wrapper/gradle-wrapper.properties",
+	"https://raw.githubusercontent.com/dhleong/dexcounter/master/gradle/gradle/wrapper/gradle-wrapper.jar",
+}
 
 type gradleDexCounter struct {
 	workspaceDir string
@@ -92,16 +106,86 @@ func ensureGradleSetUp() (string, error) {
 	// first, check if we're running locally,
 	// for development purposes
 	if _, err := os.Stat("gradle"); err == nil {
-		// aha!
 		return "gradle", nil
 	}
 
-	_, err := util.GetConfigDir("gradle")
+	// normal mode, okay create the dirs
+	gradleFilesDir, err := util.GetConfigDir("gradle")
 	if err != nil {
 		return "", err
 	}
 
-	// FIXME TODO download into the dir fetched above
+	gradleWrapperDir, err := util.GetConfigDir("gradle/gradle/wrapper")
+	if err != nil {
+		return "", err
+	}
 
-	return "", errors.New("Not implemented yet")
+	var allDone sync.WaitGroup
+	allDone.Add(len(gradleFileURLs) + len(gradleWrapperFileURLs))
+
+	// fetch all the files in parallel
+	var someErr error
+	for _, url := range gradleFileURLs {
+		go func(url string) {
+			err := downloadTo(url, gradleFilesDir)
+			if err != nil {
+				someErr = err
+			}
+			allDone.Done()
+		}(url)
+	}
+
+	for _, url := range gradleWrapperFileURLs {
+		go func(url string) {
+			downloadTo(url, gradleWrapperDir)
+			allDone.Done()
+		}(url)
+	}
+
+	allDone.Wait()
+
+	// make them executable
+	if err := os.Chmod(
+		filepath.Join(gradleFilesDir, "gradlew"),
+		0774,
+	); err != nil {
+		return "", err
+	}
+
+	if err := os.Chmod(
+		filepath.Join(gradleFilesDir, "gradlew.bat"),
+		0774,
+	); err != nil {
+		return "", err
+	}
+
+	return gradleFilesDir, someErr
+}
+
+func downloadTo(url, destDir string) error {
+
+	name := path.Base(url)
+	destFile := path.Join(destDir, name)
+
+	// create the local file
+	out, err := os.Create(destFile)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// request the remote file
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// write the response body
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
