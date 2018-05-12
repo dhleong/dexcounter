@@ -13,7 +13,6 @@ type DepCounted = func(*Counts)
 type DexCounter interface {
 	Count(
 		dependency Dependency,
-		onDepsComputed DepsComputed,
-		onDepCounted DepCounted,
+		ui UI,
 	) (*Counts, error)
 }

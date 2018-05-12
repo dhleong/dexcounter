@@ -53,8 +53,7 @@ func NewGradleDexCounter() (model.DexCounter, error) {
 
 func (dc gradleDexCounter) Count(
 	dep model.Dependency,
-	onDepsComputed model.DepsComputed,
-	onDepCounted model.DepCounted,
+	ui model.UI,
 ) (*model.Counts, error) {
 	gradlew := filepath.Join(dc.workspaceDir, "gradlew")
 	cmd := exec.Command(

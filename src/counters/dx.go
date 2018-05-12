@@ -45,17 +45,16 @@ func NewDxDexCounter(
 // Count .
 func (dc *DxDexCounter) Count(
 	dependency model.Dependency,
-	onDepsComputed model.DepsComputed,
-	onDepCounted model.DepCounted,
+	ui model.UI,
 ) (*model.Counts, error) {
 
-	dep, err := dc.depsSource.Count(dependency, onDepsComputed, onDepCounted)
+	dep, err := dc.depsSource.Count(dependency, ui)
 	if err != nil {
 		return nil, err
 	}
 
 	// notify
-	onDepsComputed(dep)
+	ui.OnDependenciesResolved(dep)
 
 	// count all dependencies in parallel
 	flattened := dep.Flatten()
@@ -68,7 +67,7 @@ func (dc *DxDexCounter) Count(
 	for _, counts := range flattened {
 		go func(counts *model.Counts) {
 			err := dc.count(counts)
-			onDepCounted(counts)
+			ui.OnDependencyCounted(counts)
 			if err != nil {
 				someErr = st.Propagate(err, "Error checking %v", counts.Dependency)
 			}
@@ -78,6 +77,11 @@ func (dc *DxDexCounter) Count(
 
 	allDone.Wait()
 
+	if someErr != nil {
+		ui.OnError(someErr)
+	} else {
+		ui.OnDone(dep)
+	}
 	return dep, someErr
 }
 

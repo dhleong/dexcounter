@@ -3,6 +3,7 @@ package dexcounter
 import (
 	"github.com/dhleong/dexcounter/src/counters"
 	"github.com/dhleong/dexcounter/src/model"
+	"github.com/dhleong/dexcounter/src/ui"
 )
 
 // Version is the current version of the app
@@ -16,4 +17,9 @@ func NewDexCounter(opts *model.Options) (model.DexCounter, error) {
 		return nil, err
 	}
 	return counters.NewDxDexCounter(opts, gradleCounter)
+}
+
+// NewUI instantiates the default UI
+func NewUI() (model.UI, error) {
+	return ui.NewDumbUI(), nil
 }
