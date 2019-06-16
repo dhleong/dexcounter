@@ -113,7 +113,7 @@ func ensureGradleSetUp() (string, error) {
 
 	// first, check if we're running locally,
 	// for development purposes
-	if _, err := os.Stat("gradle"); err == nil {
+	if _, err := os.Stat("gradle/gradlew"); err == nil {
 		return "gradle", nil
 	}
 
